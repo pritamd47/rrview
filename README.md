@@ -10,5 +10,5 @@ panel serve src/rrview/app.py --allow-websocket-origin="*" --show --args <1> -np
 
 For example, this is a sample of a recent command I used to run the dashboard -
 ```
-panel serve src/rrview/app.py --port=5200 --allow-websocket-origin="*" --show --args /tiger1/pdas47/work/2023_01_24-river-regulation/data-era5_2010_2021/regulation/regulation_data.insitu.obs_outflow.ERA5.nc -npts /tiger1/pdas47/work/2023_01_24-river-regulation/data-cumberland/cumberland_rivreg/cumberland_rivreg_pts.geojson -nlnk /tiger1/pdas47/work/2023_01_24-river-regulation/data-cumberland/cumberland_rivreg/cumberland_rivreg.geojson
+panel serve src/rrview/app.py --port=5100 --allow-websocket-origin="*" --show --args /water2/pdas47/2023_01_24-river-regulation/data-era5-2010_2021/regulation/regulation_data.insitu.obs_outflow.ERA5.nc -npts /water2/pdas47/2023_01_24-river-regulation/data-cumberland/cumberland_rivreg/cumberland_rivreg_pts.geojson -nlnk /water2/pdas47/2023_01_24-river-regulation/data-cumberland/cumberland_rivreg/cumberland_rivreg.geojson
 ```

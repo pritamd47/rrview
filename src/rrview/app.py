@@ -52,13 +52,13 @@ def plot_node(node):
         height=400, width=800, 
         yformatter=NumeralTickFormatter(format='0.00a'), 
         xformatter=DatetimeTickFormatter(days=['%b-%d-%Y'], months=['%b-%Y'], years=['%Y']),
-        ylabel='Flow (m3/d)', xlabel='Date',
+        ylabel='Flow Volume (m3)', xlabel='Date',
     )
     default_curve_opts = dict(
         interpolation='steps-mid'
     )
     
-    hover_cols = ['inflow', 'outflow', 'theoretical_natural_runoff', 'storage_change', 'obs_inflow']
+    hover_cols = ['time', 'inflow', 'outflow', 'theoretical_natural_runoff', 'storage_change', 'obs_inflow']
     tooltips = [
         ('Date', '@time{%F}'),
         ('Inflow', '@inflow{0.00a}'),
@@ -67,7 +67,11 @@ def plot_node(node):
         ('TNR', '@theoretical_natural_runoff{0.00a}'),
         ('Storage Change', '@storage_change{0.00a}')
     ]
-    hover = HoverTool(tooltips=tooltips, mode='vline')
+    hover = HoverTool(
+        tooltips=tooltips, 
+        formatters={'@time': 'datetime'},
+        mode='vline'
+        )
 
     inflow_plot = ds.sel(node=node) \
         .hvplot(kind="line", x='time', y='inflow', label='Inflow', hover_cols=hover_cols) \
@@ -105,23 +109,7 @@ def plot_node(node):
         .opts(**default_curve_opts) \
         .opts(color='#fa4224', alpha=0.8, tools=[])
 
-    # rr_plot = ds.sel(node=node) \
-    #     .hvplot(kind="line", x="time", y='regulated_runoff', label='Regulated Runoff') \
-    #     .opts(**default_opts) \
-    #     .opts(**default_curve_opts) \
-    #     .opts(color='k', alpha=0.8, tools=[])
-    
     ds['zeros'] = 0
-    # ds['time'] = ds['time'].astype(np.float64)
-    # print(ds['time'])
-    # print(ds['storage_change'])
-    # dels_plot = ds.sel(node=node) \
-    #     .hvplot(kind="area", x='time', y='storage_change', y2='zeros', label='Storage Change') \
-    #     .opts(**default_opts) \
-    #     .opts(fill_alpha=0.2, color='gray', muted_fill_alpha=0.05, muted=True, muted_line_alpha=0.3)
-    # ds['storage_change_sign'] = ds['storage_change']>=ds['zeros']
-    # dels_pos_plot = ds['storage_change'].sel(node=node) \
-    #     .hvplot(kind="bar", x='time', y='storage_change', label='Storage Change')
     dels_pos = xr.where(ds['storage_change'].sel(node=node)>=0, 1, 0)
     dels_pos_plot = ds.sel(node=node).where(dels_pos, 0) \
         .hvplot(kind="area", x="time", y='storage_change', label='Storage Change') \
@@ -153,8 +141,8 @@ def plot_graph(G):
     source = [n[0] for n in G.edges]
     target = [n[1] for n in G.edges]
 
-    nodes = hv.Nodes((x, y, node_indices, node_labels), vdims='Type')
-    simple_graph = hv.Graph(((source, target), nodes)).opts(height=300, width=300, xlabel='lon (°)', ylabel='lat (°)', arrowhead_length=0.02, directed=True, aspect='equal')
+    nodes = gv.Nodes((x, y, node_indices, node_labels), vdims='Type')
+    simple_graph = gv.Graph(((source, target), nodes))
     
     return simple_graph
 
@@ -166,9 +154,7 @@ class RegulationViewer(param.Parameterized):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        self.network_hv = plot_graph(G)
-        self.network_selection = hv.streams.Selection1D(source=self.network_hv.nodes)
-        # self.network_selection.add_subscriber(self._sync_selected_node_network_selection)
+        self.network_hv = gv.Graph([])
 
         self.current_hv = hv.Curve([])
         self.upstream_hv = hv.Curve([])
@@ -177,18 +163,10 @@ class RegulationViewer(param.Parameterized):
         self._update_upstream_nodes()
         self._update_downstream_node()
 
+        self._plot_network()
         self._plot_current_node()
         self._plot_upstream_node()
         self._plot_downstream_node()
-
-    # @param.depends('network_selection.index', watch=True)
-    # def _sync_selected_node_network_selection(self, index):
-    #     print('selection', index)
-    #     self.current_node = index
-
-    @param.depends('current_node', watch=True)
-    def _sync_selected_node_current_node(self):
-        self.network_selection.event(index=[self.current_node])
 
     @param.depends('current_node', watch=True)
     def _update_downstream_node(self):
@@ -221,12 +199,17 @@ class RegulationViewer(param.Parameterized):
         else:
             self.downstream_hv = hv.Curve([])
 
-    @param.depends('network_selection.index', watch=True)
+    def _plot_network(self):
+        self.network_hv = plot_graph(G)
+
     def _style_network(self):
         return self.network_hv.opts(
-                title='Reservoir Network'
-            )
-
+                height=300, width=300,
+                title='Reservoir network',
+                xlabel='lon (°)', ylabel='lat (°)', 
+                arrowhead_length=0.02, directed=True, aspect='equal'
+            ) * gv.tile_sources.OSM
+    
     def _style_current_node(self):
         return self.current_hv.opts(title=f'Current Node: {self.current_node} - {G.nodes[self.current_node]["name"].replace("_", " ")}')
     
@@ -262,24 +245,11 @@ class RegulationViewer(param.Parameterized):
         return pn.Param(self.param, widgets={'downstream_node': {'type': pn.widgets.IntInput, 'disabled': True}})
 
 
-    @param.depends('current_node', 'upstream_nodes', 'current_hv', 'upstream_hv')
-    def view(self):
-        return pn.Row(
-            pn.Column(
-                self.network_hv, self._info_plot, self.params_pane
-            ),
-            pn.Column(
-                self._style_upstream_node,
-                self._style_current_node,
-                self._style_downstream_node
-            )
-        )
-
 def setup_dashboard(rv):
     global template
 
     template.sidebar.append(
-        pn.Column(rv.network_hv, rv._info_plot, rv.params_pane)
+        pn.Column(rv._style_network, rv._info_plot, rv.params_pane)
     )
     template.main.append(
         pn.Column(
