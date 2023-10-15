@@ -58,20 +58,22 @@ def plot_node(node):
         interpolation='steps-mid'
     )
     
-    hover_cols = ['time', 'inflow', 'outflow', 'theoretical_natural_runoff', 'storage_change', 'obs_inflow']
+    hover_cols = ['time', 'inflow', 'outflow', 'theoretical_natural_runoff', 'storage_change', 'obs_inflow', 'regulation', 'obs_outflow']
     tooltips = [
         ('Date', '@time{%F}'),
-        ('Inflow', '@inflow{0.00a}'),
-        ('Observed Inflow', '@obs_inflow{0.00a}'),
-        # ('Outflow', '@outflow{0.00a}'),
+        ('Inflow (mod/obs)', '@inflow{0.00a} / @obs_inflow{0.00a}'),
+        # ('Observed Inflow', '@obs_inflow{0.00a}'),
+        ('Outflow (mod/obs)', '@outflow{0.00a} / @obs_outflow{0.00a}'),
+        # ('Observed Outflow', '@obs_outflow{0.00a}'),
         ('TNR', '@theoretical_natural_runoff{0.00a}'),
-        ('Storage Change', '@storage_change{0.00a}')
+        ('Storage Change (mod/obs)', '@storage_change{0.00a} / @obs_storage_change{0.00a}'),
+        ('Regulation', '@regulation{0.00a}')
     ]
     hover = HoverTool(
         tooltips=tooltips, 
         formatters={'@time': 'datetime'},
         mode='vline'
-        )
+    )
 
     inflow_plot = ds.sel(node=node) \
         .hvplot(kind="line", x='time', y='inflow', label='Inflow', hover_cols=hover_cols) \
@@ -107,7 +109,7 @@ def plot_node(node):
         .hvplot(kind="line", x="time", y='obs_outflow', label='Observed Outflow') \
         .opts(**default_opts) \
         .opts(**default_curve_opts) \
-        .opts(color='#fa4224', alpha=0.8, tools=[])
+        .opts(color='#fa4224', alpha=0.8, tools=[], line_dash='4 2')
 
     ds['zeros'] = 0
     dels_pos = xr.where(ds['storage_change'].sel(node=node)>=0, 1, 0)
@@ -123,8 +125,14 @@ def plot_node(node):
         .hvplot(kind="line", x="time", y='storage_change', label='Storage Change') \
         .opts(**default_opts) \
         .opts(color='green', alpha=0.4, muted=True, muted_alpha=0.15, interpolation='steps-mid', tools=[])
+    
+    regulation_plot = ds.sel(node=node) \
+        .hvplot(kind="line", x="time", y='regulation', label='Regulation') \
+        .opts(**default_opts) \
+        .opts(**default_curve_opts) \
+        .opts(color='#e17701', alpha=0.8, tools=[])
 
-    return inflow_plot * outflow_plot * tnr_plot * obs_inflow_plot * nr_plot * dels_pos_plot * dels_neg_plot * dels_plot * obs_outflow
+    return inflow_plot * outflow_plot * tnr_plot * obs_inflow_plot * nr_plot * dels_pos_plot * dels_neg_plot * dels_plot * obs_outflow * regulation_plot
 
 def plot_graph(G):
     x = []
@@ -258,7 +266,7 @@ def setup_dashboard(rv):
             rv._style_downstream_node
         )
     )
-    return template.servable();
+    return template.servable()
 
 
 rv = RegulationViewer()
