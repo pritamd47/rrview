@@ -1,0 +1,11 @@
+channels:
+  - conda-forge
+dependencies:
+  - xarray
+  - bokeh
+  - holoviews
+  - hvplot
+  - geoviews
+  - networkx
+  - pip:
+    - geonetworkx
